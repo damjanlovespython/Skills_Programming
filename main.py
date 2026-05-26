@@ -11,6 +11,7 @@ Main script that orchestrates the full pipeline:
 import sys
 from tkinter import Tk, filedialog
 from CV_Upload import extract_text, extract_from_url, clean_text
+from Structure_Parser import parse_cv, parse_job
 
 # ============================================================
 # Module imports (uncomment as you build each module)
@@ -108,7 +109,7 @@ def get_job_text():
         retry = input("\nCould not get job offer text. Try again? (yes/no): ").strip().lower()                                 # ask the user if want to try again
         if retry != "yes":
             print("Thank you for using CV Job Matcher. Goodbye!")                                                              # if refuse put end to the loop and quite program
-            sys.exit(0)
+            sys.exit(0)                                                                                                        # quite program
 
 
 # ============================================================
@@ -138,12 +139,22 @@ def main():
     # --- Step 3: Parse and extract keywords ---
     print("\nStep 3: Analyzing documents...")
     print("-" * 30)
-    # TODO: uncomment when parser.py is ready
-    # cv_data = parse_cv(cv_text)
-    # job_data = parse_job(job_text)
-    print("  [Parser module not yet built]")
-    print(f"  CV preview: {cv_text[:100]}...")
-    print(f"  Job preview: {job_text[:100]}...")
+    cv_data = parse_cv(cv_text)
+    job_data = parse_job(job_text)
+    print(f"  CV - Programming: {cv_data['programming']}")
+    print(f"  CV - Technical: {cv_data['technical_skills']}")
+    print(f"  CV - Soft skills: {cv_data['soft_skills']}")
+    print(f"  CV - Languages:")
+    for lang, info in cv_data['languages'].items():
+        print(f"    {lang}: {info['level']} (rank {info['rank']})")
+    print(f"\n  Job - Technical: {job_data['technical_skills']}")
+    print(f"  Job - Soft skills: {job_data['soft_skills']}")
+    print(f"  Job - Languages:")
+    for lang, info in job_data['languages'].items():
+        print(f"    {lang}: {info['level']} (rank {info['rank']})")
+    print(f"  Job - Importance tags:")
+    for skill, tag in job_data['importance'].items():
+        print(f"    {skill}: {tag}")
 
     # --- Step 4: Compute matching score ---
     print("\nStep 4: Computing match score...")

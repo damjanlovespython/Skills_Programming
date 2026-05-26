@@ -9,10 +9,15 @@ and extracting clean text from them.
 # library
 import docx
 import requests
+from selenium import webdriver
+import chromedriver_autoinstaller
+chromedriver_autoinstaller.install()                            # needed for selenium otherwise need to install Chrome manually
+        
 # function import
 from pypdf import PdfReader
 from pathlib import Path
 from bs4 import BeautifulSoup
+from selenium.webdriver.chrome.options import Options
 
 # function definition:
 
@@ -64,7 +69,7 @@ def extract_text(filepath):
     return cleaned
 
 # extraction of job-offer (URL version)
-def extract_from_url(url):
+def extract_from_url_simple(url):
     """
     Extract text content from a webpage URL.
     Uses requests to fetch the page and BeautifulSoup to parse the HTML.
@@ -93,7 +98,6 @@ def extract_from_url(url):
         if not cleaned:                                                 # error message 
             print("Warning: No text could be extracted from the URL.")
             return None
-
         return cleaned                                                  # return clean
 
     # handling the different issue linked with the download of the page
@@ -108,11 +112,47 @@ def extract_from_url(url):
         return None
 
 
+# version of JavaScrpt file otherwise is not able to download them
+def extract_from_url(url):
+    """
+    Tries simple extraction first, falls back to Selenium if needed.
+    """
+    # Try 1: fast method
+    job_text = extract_from_url_simple(url)
+    if job_text:
+        return job_text
+    print("  Simple extraction failed. Trying browser-based extraction...")
+
+    # Try 2: Selenium
+    try:
+        options = Options()
+        options.add_argument("--headless")
+        driver = webdriver.Chrome(options=options)
+        driver.get(url)
+        driver.implicitly_wait(5)
+
+        raw_text = driver.find_element("tag name", "body").text
+        driver.quit()
+
+        return clean_text(raw_text) if raw_text else None
+    except Exception as e:
+        print(f"  Browser extraction also failed: {e}")
+        return None
 
 
 
 
+
+
+
+
+
+
+
+
+# ==========================================
 # analysis of the text
+# ==========================================
 
 def clean_text(text):
     """

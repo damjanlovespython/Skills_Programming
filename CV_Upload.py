@@ -11,6 +11,7 @@ import docx
 import requests
 from selenium import webdriver
 import chromedriver_autoinstaller
+import time
 chromedriver_autoinstaller.install()                            # needed for selenium otherwise need to install Chrome manually
         
 # function import
@@ -129,11 +130,9 @@ def extract_from_url(url):
         options.add_argument("--headless")
         driver = webdriver.Chrome(options=options)
         driver.get(url)
-        driver.implicitly_wait(5)
-
+        time.sleep(15)                                                    # needed to get time to the program to download the content of the file
         raw_text = driver.find_element("tag name", "body").text
         driver.quit()
-
         return clean_text(raw_text) if raw_text else None
     except Exception as e:
         print(f"  Browser extraction also failed: {e}")

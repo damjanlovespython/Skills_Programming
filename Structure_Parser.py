@@ -1,28 +1,14 @@
 """
 Module 2: Parser
-
-Text Processing and Keyword Extraction:
-This module takes raw text from the extractor and turns it into
-structured data that the scorer can compare.
-
-Two main functions:
-- parse_cv(text)      → extracts what the candidate HAS
-- parse_job(text)     → extracts what the job REQUIRES
-
-Features:
-- Keyword matching with word boundary detection
-- Language proficiency level extraction
-- Years of experience extraction
-- Synonym grouping (e.g. "MS Office" = "Microsoft Office")
-- Contextual skill detection (e.g. "Led a team" → leadership)
-- Section-based importance tagging
+This module takes raw text from the CV_Upload and turns it into data (important keywords) that the scorer can compare.
+Two main functions: parse_cv(text) which extracts what the candidate has and parse_job(text) which extracts what the job needs
 """
 
 import re
 
 
 
-# keyword
+# keywords
 
 PROGRAMMING_LANGUAGES = ["python", "java", "javascript", "c#", "c\\+\\+", "r", "sql", "html", "css","php", "ruby", "swift", "kotlin", "typescript", "matlab", "vba", "latex","scala", "perl", "rust", "go", "golang", "lua", "haskell", "fortran","cobol", "assembly", "bash", "shell", "powershell", "objective-c","visual basic", "vb.net", "groovy", "dart", "julia", "sas", "stata","nosql", "plsql", "t-sql", "xml", "json", "yaml", "graphql","solidity", "elixir", "clojure", "lisp", "prolog"]
 
@@ -36,16 +22,7 @@ PHYSICS_SKILLS = ["physics", "quantum mechanics", "thermodynamics", "electromagn
 
 MEDICINE_SKILLS = ["medicine", "clinical research", "clinical trials", "clinical practice","patient care", "diagnosis", "treatment", "surgery", "anesthesia","emergency medicine", "intensive care", "primary care","internal medicine", "pediatrics", "geriatrics", "oncology","cardiology", "neurology", "dermatology", "orthopedics","psychiatry", "radiology", "pathology", "immunology","gastroenterology", "endocrinology", "nephrology", "pulmonology","ophthalmology", "urology", "obstetrics", "gynecology","pharmacology", "pharmacy", "drug development", "drug discovery","clinical pharmacology", "pharmaceutical", "gcp", "fda","regulatory affairs", "pharmacovigilance", "drug safety","biotechnology", "genomics", "proteomics", "bioinformatics","molecular biology", "cell biology", "microbiology", "virology","genetics", "gene therapy", "crispr", "pcr", "sequencing","laboratory", "lab techniques", "in vitro", "in vivo","biostatistics", "epidemiology", "public health","healthcare", "hospital", "nursing", "physiotherapy","occupational therapy", "medical devices", "medical imaging","electronic health records", "ehr", "telemedicine", "telehealth","health informatics", "hipaa"]
 
-LAW_SKILLS = ["law", "legal", "litigation", "arbitration", "mediation",
-    "corporate law", "contract law", "commercial law", "employment law",
-    "intellectual property", "patent", "trademark", "copyright",
-    "data protection", "privacy law", "gdpr", "regulatory law",
-    "tax law", "banking law", "securities law", "competition law",
-    "antitrust", "real estate law", "environmental law",
-    "criminal law", "constitutional law", "international law",
-    "mergers acquisitions", "legal research", "legal writing",
-    "due diligence", "compliance", "governance", "paralegal",
-    "notary", "legal counsel", "in-house counsel"]
+LAW_SKILLS = ["law", "legal", "litigation", "arbitration", "mediation","corporate law", "contract law", "commercial law", "employment law","intellectual property", "patent", "trademark", "copyright","data protection", "privacy law", "gdpr", "regulatory law","tax law", "banking law", "securities law", "competition law","antitrust", "real estate law", "environmental law","criminal law", "constitutional law", "international law","mergers acquisitions", "legal research", "legal writing","due diligence", "compliance", "governance", "paralegal","notary", "legal counsel", "in-house counsel"]
 
 MARKETING_SKILLS = ["marketing", "digital marketing", "content marketing", "seo","sem", "social media marketing", "email marketing", "ppc","google ads", "facebook ads", "instagram", "linkedin marketing","marketing automation", "hubspot", "mailchimp", "marketo","brand management", "branding", "market research", "market analysis","customer segmentation", "target audience", "buyer persona","public relations", "pr", "copywriting", "content creation","content strategy", "storytelling", "blogging", "journalism","graphic design", "video production", "photography","influencer marketing", "affiliate marketing", "growth hacking","conversion optimization", "cro", "funnel", "lead generation","sales", "business development", "account management","key account", "client relationship", "customer success","crm", "pipeline management", "cold calling", "prospecting","b2b", "b2c", "e-commerce", "retail", "merchandising"]
 
@@ -128,7 +105,7 @@ CONTEXTUAL_PATTERNS = {
     ],
     "communication": [
         r"present(ed|ing)\s+(to|at|findings|results|recommendations)",  # "presented findings to"
-        r"(wrote|drafted|authored)\s+(reports|proposals|documents)",     # "wrote reports"
+        r"(wrote|drafted|authored)\s+(reports|proposals|documents)",    # "wrote reports"
         r"client[\s-]facing",                                           # "client-facing role"
         r"stakeholder\s+(engagement|communication|management)",         # "stakeholder engagement"
         r"liaised\s+with",                                              # "liaised with partners"
@@ -149,9 +126,9 @@ CONTEXTUAL_PATTERNS = {
     ],
     "problem solving": [
         r"troubleshoot(ed|ing)?",                                       # "troubleshooting issues"
-        r"resolved\s+(issues?|problems?|conflicts?|bugs?)",            # "resolved issues"
+        r"resolved\s+(issues?|problems?|conflicts?|bugs?)",             # "resolved issues"
         r"debug(ged|ging)?",                                            # "debugging code"
-        r"improved\s+(performance|efficiency|processes?|workflow)",      # "improved efficiency"
+        r"improved\s+(performance|efficiency|processes?|workflow)",     # "improved efficiency"
         r"optimiz(ed|ing)\s+(performance|processes?|operations?)",      # "optimized processes"
     ],
     "innovation": [
@@ -201,42 +178,42 @@ def extract_language_proficiency(text):
     Extracts languages along with their proficiency levels.
     Returns a dict like: {"english": {"level": "proficient", "rank": 6}, ...}
     """
+    # transform all the text in lowercase and define a list to store it
     text_lower = text.lower()                                                               # put everything in lower case to avoid consistency issue
     results = {}                                                                            # store the result
-
+    # go through a loop of previously define language and make sure that we only take into consideration the language (full word)
     for language in LANGUAGES:                                          
         pattern = r'\b' + re.escape(language) + r'\b'
         if not re.search(pattern, text_lower):
             continue
-
-        # Found the language — now look for proficiency nearby
-        # Check both before and after the language mention
+    # found the language - now look for proficiency nearby
+    # check both before and after the language mention
         match = re.search(pattern, text_lower)
         if match:
-            # Text before the language (up to previous delimiter)
+            # text before the language (up to previous delimiter)
             before_text = text_lower[max(0, match.start() - 60):match.start()]
             for delimiter in [",", ";", "\n"]:
                 if delimiter in before_text:
                     before_text = before_text[before_text.rindex(delimiter) + 1:]
 
-            # Text after the language (up to next delimiter)
+            # text after the language (up to next delimiter)
             after_text = text_lower[match.end():match.end() + 80]
             for delimiter in [",", ";", "\n"]:
                 if delimiter in after_text:
                     after_text = after_text[:after_text.index(delimiter)]
 
             surrounding = before_text + " " + after_text
-
+            # find proficency level
             best_level = None
             best_rank = 0
-
+            # loops through all the level of proficiency
             for level_text, level_name in PROFICIENCY_LEVELS.items():
                 if level_text in surrounding:
                     rank = PROFICIENCY_RANK.get(level_name, 0)
                     if rank > best_rank:
                         best_rank = rank
                         best_level = level_name
-
+            # return the level except if cannot find one return 0
             if best_level:
                 results[language] = {"level": best_level, "rank": best_rank}
             else:
@@ -244,29 +221,24 @@ def extract_language_proficiency(text):
 
     return results
 
-
-# ============================================================
-# 5. YEARS OF EXPERIENCE EXTRACTION
-# ============================================================
+# define the number of year of experience
 
 def extract_experience_requirements(text):
     """
-    Extracts years of experience mentioned in text.
-    Returns a list of dicts like:
-    [{"years": 3, "context": "3+ years of experience in Python"}, ...]
+    Extracts years of experience mentioned in text. Returns 
     """
     text_lower = text.lower()
     results = []
 
     # Patterns for experience requirements
     patterns = [
-        r'(\d+)\+?\s*years?\s*(of\s+)?(experience|expertise|work)',    # "3+ years of experience"
-        r'(\d+)\+?\s*years?\s*in\s+[\w\s]+',                           # "3 years in finance"
+        r'(\d+)\+?\s*years?\s*(of\s+)?(experience|expertise|work)',     # "3+ years of experience"
+        r'(\d+)\+?\s*years?\s*in\s+[\w\s]+',                            # "3 years in finance"
         r'minimum\s+(\d+)\s*years?',                                    # "minimum 3 years"
         r'at\s+least\s+(\d+)\s*years?',                                 # "at least 2 years"
-        r'(\d+)\s*-\s*(\d+)\s*years?\s*(of\s+)?(experience|work)',     # "2-3 years of experience"
+        r'(\d+)\s*-\s*(\d+)\s*years?\s*(of\s+)?(experience|work)',      # "2-3 years of experience"
     ]
-
+    # loops through the pattern to identify potential experience formulation
     for pattern in patterns:
         for match in re.finditer(pattern, text_lower):
             full_match = match.group(0)
@@ -291,35 +263,37 @@ PREFERRED_SECTIONS = ["preferred qualifications", "nice to have", "bonus skills"
 
 RESPONSIBILITY_SECTIONS = ["responsibilities", "key responsibilities", "duties","your tasks", "your role", "what you will do","job description", "role description"]
 
-
+# split the CV into different part
 def detect_sections(text):
     """
     Splits text into sections based on common headers.
     Returns dict with section names as keys and text content as values.
     """
-    section_headers = ["education", "work experience", "experience", "employment","professional experience", "career history","skills", "technical skills", "core competencies", "competencies""additional information", "personal information","languages", "certifications", "certificates","projects", "publications", "awards", "honors","extra-curricular", "extracurricular", "activities","volunteering", "volunteer experience", "community involvement","interests", "hobbies", "references","professional summary", "summary", "profile", "objective","requirements", "qualifications", "required qualifications","preferred qualifications", "minimum qualifications","responsibilities", "key responsibilities", "duties","what we offer", "benefits", "perks", "compensation","about us", "about the company", "company overview","job description", "role description", "position overview","your profile", "your tasks", "your role","what you bring", "what we are looking for","nice to have", "bonus skills", "desired skills","how to apply", "application process"]
-
+    section_headers = ["education", "work experience", "experience", "employment","professional experience", "career history","skills", "technical skills", "core competencies", "competencies", "additional information", "personal information","languages", "certifications", "certificates","projects", "publications", "awards", "honors","extra-curricular", "extracurricular", "activities","volunteering", "volunteer experience", "community involvement","interests", "hobbies", "references","professional summary", "summary", "profile", "objective","requirements", "qualifications", "required qualifications","preferred qualifications", "minimum qualifications","responsibilities", "key responsibilities", "duties","what we offer", "benefits", "perks", "compensation","about us", "about the company", "company overview","job description", "role description", "position overview","your profile", "your tasks", "your role","what you bring", "what we are looking for","nice to have", "bonus skills", "desired skills","how to apply", "application process"]
+    # the code split each part into by its line
     lines = text.split("\n")
     sections = {}
     current_section = "header"
     current_content = []
-
+    # remove spacing and put everything in lower case (cleaning)
     for line in lines:
         line_lower = line.strip().lower()
-
+        # check if the line is a header and save the following in a content so we have (title - text for each entry)
         is_header = False
         for header in section_headers:
             if line_lower == header or line_lower.startswith(header + ":") or line_lower.startswith(header + " -"):
                 is_header = True
+                # save the text before starting a new section
                 if current_content:
                     sections[current_section] = "\n".join(current_content)
+                # start the new section
                 current_section = header
                 current_content = []
                 break
-
+        # if not a header it adds the line to the content of the section
         if not is_header:
             current_content.append(line)
-
+    # save the last section
     if current_content:
         sections[current_section] = "\n".join(current_content)
 
@@ -328,13 +302,13 @@ def detect_sections(text):
 
 def tag_keyword_importance(keyword, sections):
     """
-    Tags a keyword with its importance based on which section it appears in.
-    Returns: "required", "preferred", "responsibility", or "general"
+    Tags a keyword with its importance based on which section it appears in and returns a single keyword that are important
     """
+    # clean the keyword and use the structure to match the keyword as a full structure
     for section_name, section_text in sections.items():
         text_lower = section_text.lower()
         pattern = r'\b' + re.escape(keyword.lower()) + r'\b'
-
+        # check for the keyword in the text and put it in one of the other class (either required, preferred or responsiblity (depending  on the job offer))
         if re.search(pattern, text_lower):
             if section_name in REQUIRED_SECTIONS:
                 return "required"
@@ -342,18 +316,19 @@ def tag_keyword_importance(keyword, sections):
                 return "preferred"
             elif section_name in RESPONSIBILITY_SECTIONS:
                 return "responsibility"
-
-    return "general"
+    # if keyword in none of the part above then it only return
+    return "general"          
 
 # Retrun a list of the key words
 
 def find_keywords(text, keyword_list):
     """
-    Searches text for keywords using word boundary matching.
-    Returns list of found keywords (no duplicates).
+    Searches text for keywords using word boundary matching and returns list of found keywords.
     """
+    # cleaning the text
     text_lower = text.lower()
     found = []
+    # goes through all the keyword in the list and identify it using the pattern of the unique word and addit is to a new list
     for keyword in keyword_list:
         pattern = r'\b' + re.escape(keyword.lower()) + r'\b'
         if re.search(pattern, text_lower):
@@ -364,15 +339,15 @@ def find_keywords(text, keyword_list):
 
 def find_contextual_skills(text):
     """
-    Detects skills from context using regex patterns.
-    Returns list of skills inferred from the text.
+    Detects skills from context using patterns and returns list of skills from the text.
     """
     text_lower = text.lower()
     found = []
-
+    # locate the skills be using the pattern define above
     for skill, patterns in CONTEXTUAL_PATTERNS.items():
         for pattern in patterns:
             if re.search(pattern, text_lower):
+                # we only check for each skill once
                 if skill not in found:
                     found.append(skill)
                 break                                                   # one match is enough for this skill
@@ -382,15 +357,14 @@ def find_contextual_skills(text):
 
 def resolve_synonyms(keywords):
     """
-    Groups synonyms together so that "MS Office" and "Microsoft Office"
-    are treated as the same skill.
-    Returns a dict mapping canonical name → list of variants found.
+    Groups synonyms together so that "MS Office" and "Microsoft Office"are treated as the same skill and the function will return the variants found.
     """
     resolved = {}
-
+    # loops over the synomyms and check for the different variant 
     for canonical, variants in SYNONYMS.items():
         found_variants = []
         for keyword in keywords:
+            # deal with difference in term of high/lowcase
             if keyword.lower() in [v.lower() for v in variants]:
                 found_variants.append(keyword)
         if found_variants:
@@ -398,119 +372,82 @@ def resolve_synonyms(keywords):
 
     # Also include keywords that aren't in any synonym group
     all_synonym_variants = []
+    # the list of all the synoyme for all the synoyme group
     for variants in SYNONYMS.values():
         all_synonym_variants.extend([v.lower() for v in variants])
-
+    # deal with the word that are not linked to a list of synoym and add them to resolve at the end (avoid losing them  them)
     for keyword in keywords:
         if keyword.lower() not in all_synonym_variants:
             resolved[keyword] = [keyword]
 
     return resolved
 
-# Parser function
+
+
+
+# Combining function for parser return
 
 def parse_cv(text):
     """
-    Parses the CV text and extracts structured data.
-
-    Returns a dictionary with:
-        - programming: programming languages found
-        - technical_skills: all technical/industry skills found
-        - technical_resolved: technical skills with synonyms grouped
-        - soft_skills: interpersonal skills (keyword + contextual)
-        - contextual_skills: skills inferred from context
-        - languages: languages with proficiency levels
-        - education: education levels and certifications
-        - finance: finance-specific skills
-        - sections: detected sections
-        - full_text: original text
+    Takes the CV text and extracts all the important keywords (skills, languages, education, sections).
+    Returns a dict with all the structured data ready to be compared by the scorer.
     """
+    # split the CV into section 
     sections = detect_sections(text)
-
-    # Keyword matching
+    # Keyword matching where we scan through CV to identify category of words
     programming = find_keywords(text, PROGRAMMING_LANGUAGES)
     technical = find_keywords(text, ALL_TECHNICAL)
     soft = find_keywords(text, SOFT_SKILLS)
     languages = extract_language_proficiency(text)
     education = find_keywords(text, EDUCATION_LEVELS)
     finance = find_keywords(text, FINANCE_SKILLS)
-
-    # Contextual skill detection
+    # find the skills that weren't written as keywords (using pattern and sentence construction)
     contextual = find_contextual_skills(text)
-
     # Merge contextual soft skills with keyword soft skills
     for skill in contextual:
         if skill in [s.lower() for s in SOFT_SKILLS] and skill not in soft:
             soft.append(skill)
-
-    # Resolve synonyms for technical skills
+    # Resolve grouping of synonyms for technical skills 
     technical_resolved = resolve_synonyms(technical)
-
-    result = {
-        "programming": programming,
-        "technical_skills": technical,
-        "technical_resolved": technical_resolved,
-        "soft_skills": soft,
-        "contextual_skills": contextual,
-        "languages": languages,
-        "education": education,
-        "finance": finance,
-        "sections": sections,
-        "full_text": text}
-
+    # grouping and return
+    result = {"programming": programming,"technical_skills": technical,"technical_resolved": technical_resolved,  "soft_skills": soft,"contextual_skills": contextual,"languages": languages,"education": education,"finance": finance,"sections": sections,"full_text": text}
     return result
+
+
+
 
 
 def parse_job(text):
     """
     Parses job offer text and extracts requirements.
-    Same structure as parse_cv plus importance tagging.
     """
+    # define the different part of the CV
     sections = detect_sections(text)
-
-    # Keyword matching
+    # Match the different important concept of the CV
     programming = find_keywords(text, PROGRAMMING_LANGUAGES)
     technical = find_keywords(text, ALL_TECHNICAL)
     soft = find_keywords(text, SOFT_SKILLS)
     languages = extract_language_proficiency(text)
     education = find_keywords(text, EDUCATION_LEVELS)
     finance = find_keywords(text, FINANCE_SKILLS)
-
-    # Contextual skill detection
+    # contextual skill detection and sentence pattern
     contextual = find_contextual_skills(text)
-
     for skill in contextual:
         if skill in [s.lower() for s in SOFT_SKILLS] and skill not in soft:
             soft.append(skill)
-
-    # Resolve synonyms
+    # identify synonyms
     technical_resolved = resolve_synonyms(technical)
-
-    # Tag importance of each technical skill
+    # define importance (required, prefeered, responsibility) of each technical skill present in the job description 
     importance = {}
     for keyword in technical:
         importance[keyword] = tag_keyword_importance(keyword, sections)
-
-    # Tag importance of each soft skill
+    # same but for importance of each soft skill
     for keyword in soft:
         importance[keyword] = tag_keyword_importance(keyword, sections)
-
-    # Experience requirements
+    # make sure it fits the experience requirements from the job description (2+ year of experience)
     experience = extract_experience_requirements(text)
-
-    result = {
-        "programming": programming,
-        "technical_skills": technical,
-        "technical_resolved": technical_resolved,
-        "soft_skills": soft,
-        "contextual_skills": contextual,
-        "languages": languages,
-        "education": education,
-        "finance": finance,
-        "importance": importance,
-        "experience_required": experience,
-        "sections": sections,
-        "full_text": text}
+    # grouping and return
+    result = {"programming": programming,"technical_skills": technical,"technical_resolved": technical_resolved,"soft_skills": soft,"contextual_skills": contextual,"languages": languages,"education": education,"finance": finance,"importance": importance,"experience_required": experience,"sections": sections,"full_text": text}
     return result
 
 

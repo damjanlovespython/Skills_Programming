@@ -1,3 +1,3 @@
-import streamlit as sl
+import streamlit as st
 
-sl.write("test")
+st.write("test")

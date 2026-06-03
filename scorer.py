@@ -101,7 +101,7 @@ def compute_score(cv_data: dict, job_data: dict) -> dict:
     # ── Category overlap ──────────────────────────────────
     # run keyword overlap for each of the four skill categories
     tech_matched, tech_missing, tech_ratio = overlap(
-        cv_data["technical_resolved"], job_data["technical_resolved"]
+        cv_data["technical_skills"], job_data["technical_skills"]
     )
     prog_matched, prog_missing, prog_ratio = overlap(
         cv_data["programming"], job_data["programming"]

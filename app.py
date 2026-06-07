@@ -14,16 +14,31 @@ It orchestrates the same pipeline as main.py but through a Streamlit web app:
 import streamlit as st
 import tempfile
 import os
+import html as html_lib  # standard library — used to escape user content before injecting into HTML
+import logging
 
-# import the existing pipeline modules so we reuse the same logic as main.py
-from CV_Upload import extract_text, extract_from_url, clean_text
-from Structure_Parser import parse_cv, parse_job
-from scorer import compute_score
+# module-level logger — records errors without crashing the app
+logger = logging.getLogger(__name__)
+
+# ============================================================
+# Pipeline Import
+# Wrapped in a try/except so a missing or broken module shows
+# a clear error in the UI rather than a raw Python traceback.
+# ============================================================
+
+try:
+    from CV_Upload import extract_text, extract_from_url, clean_text
+    from Structure_Parser import parse_cv, parse_job
+    from scorer import compute_score
+    _IMPORT_ERROR = None
+except ImportError as e:
+    _IMPORT_ERROR = str(e)
+    logger.error("Failed to import pipeline module: %s", e)
 
 # ============================================================
 # Page Configuration
 # Streamlit requires set_page_config to be the very first
-# st call in the script, before any other rendering
+# st call in the script, before any other rendering.
 # ============================================================
 
 st.set_page_config(
@@ -236,23 +251,56 @@ def save_upload_to_temp(uploaded_file) -> str:
     Streamlit's UploadedFile is an in-memory buffer, not a file on disk.
     CV_Upload.extract_text() needs a real file path, so we write the
     buffer to a temporary file and return its path.
-    The caller is responsible for deleting the temp file afterwards.
+
+    The caller must delete the temp file after use. If writing fails,
+    any partially created temp file is cleaned up here before re-raising.
 
     Parameters: uploaded_file — the Streamlit UploadedFile object
     Returns: path to the temporary file on disk
+    Raises: IOError if the file cannot be written to disk
     """
     # preserve the original extension so extract_text() can detect the format
-    suffix = os.path.splitext(uploaded_file.name)[1]
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(uploaded_file.read())  # write the buffer to disk
-        return tmp.name                  # return the path for the caller to use
+    suffix = os.path.splitext(uploaded_file.name)[1].lower()
+
+    # only allow extensions the pipeline actually supports — reject anything else
+    allowed_extensions = {".pdf", ".docx", ".txt"}
+    if suffix not in allowed_extensions:
+        raise ValueError(f"Unsupported file type '{suffix}'. Allowed: {allowed_extensions}")
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp_path = tmp.name
+            tmp.write(uploaded_file.read())  # write the in-memory buffer to disk
+        return tmp_path
+    except Exception as e:
+        # if something went wrong, clean up any partially created file
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise IOError(f"Could not save uploaded file to disk: {e}") from e
 
 
-def render_tags(items, css_class):
+def _escape(text: str) -> str:
+    """
+    HTML-escapes a string so it is safe to inject into HTML markup.
+    This prevents XSS — if a skill name extracted from a CV or job offer
+    contained characters like < > & ' " they would otherwise be
+    interpreted as HTML rather than displayed as plain text.
+
+    Parameters: text — the raw string to escape
+    Returns: the HTML-escaped string
+    """
+    return html_lib.escape(str(text))
+
+
+def render_tags(items, css_class: str) -> None:
     """
     Renders a list of skill keywords as coloured pill tags in the UI.
     Each category has its own CSS class (tag-tech, tag-soft, etc.) which
     controls the background/border colour defined in the CSS block above.
+
+    All item strings are HTML-escaped before rendering to prevent XSS
+    in case a skill name extracted from a document contains special characters.
 
     Parameters:
         items     — list of skill strings to display
@@ -262,18 +310,24 @@ def render_tags(items, css_class):
         # show a muted placeholder so the layout doesn't collapse
         st.markdown("<span style='color:#555;font-size:0.8rem'>None found</span>", unsafe_allow_html=True)
         return
-    # build all tags as a single HTML string to avoid one st.markdown() call per tag
+
+    # escape each item and build all tags as a single HTML string
+    # to avoid one st.markdown() call per tag (better performance)
+    safe_class = _escape(css_class)  # escape the class name too, even though it's internal
     html = "<div class='tag-wrap'>" + "".join(
-        f"<span class='tag {css_class}'>{item}</span>" for item in sorted(items)
+        f"<span class='tag {safe_class}'>{_escape(str(item))}</span>"
+        for item in sorted(items)
     ) + "</div>"
     st.markdown(html, unsafe_allow_html=True)
 
 
-def render_match_list(matched, missing):
+def render_match_list(matched: list, missing: list) -> None:
     """
-    Renders a side-by-side list of matched and missing skills.
+    Renders a list of matched and missing skills with colour-coded dots.
     Matched skills show a green dot; missing skills show a grey dot
-    and a muted text colour so the gap is immediately obvious.
+    and muted text colour so the gap is immediately obvious.
+
+    All skill strings are HTML-escaped before rendering to prevent XSS.
 
     Parameters:
         matched — list of skill strings found in both CV and job offer
@@ -282,14 +336,39 @@ def render_match_list(matched, missing):
     html = ""
     # matched skills first so the positive result appears at the top
     for item in sorted(matched):
-        html += f"<div class='match-row'><div class='match-dot dot-match'></div>{item}</div>"
-    # missing skills below, greyed out
+        html += f"<div class='match-row'><div class='match-dot dot-match'></div>{_escape(str(item))}</div>"
+    # missing skills below, greyed out to make gaps obvious
     for item in sorted(missing):
-        html += f"<div class='match-row'><div class='match-dot dot-missing'></div><span style='color:#555'>{item}</span></div>"
+        html += f"<div class='match-row'><div class='match-dot dot-missing'></div><span style='color:#555'>{_escape(str(item))}</span></div>"
+
     if html:
         st.markdown(html, unsafe_allow_html=True)
     else:
         st.markdown("<span style='color:#555;font-size:0.8rem'>No overlap to show</span>", unsafe_allow_html=True)
+
+
+def _safe_lang_items(languages) -> list:
+    """
+    Converts the languages dict from the parser into a list of display strings.
+    Handles the case where the dict values are not in the expected format —
+    e.g. if a language entry is missing the 'level' key, we fall back to
+    just the language name rather than crashing.
+
+    Parameters: languages — the languages dict from parse_cv() or parse_job()
+    Returns: list of strings like "english (native)"
+    """
+    if not isinstance(languages, dict):
+        return []
+    items = []
+    for lang, info in languages.items():
+        try:
+            # info should be a dict with a 'level' key
+            level = info.get("level", "unknown") if isinstance(info, dict) else "unknown"
+            items.append(f"{lang} ({level})")
+        except Exception:
+            # if anything goes wrong with a single entry, skip it rather than crashing
+            items.append(str(lang))
+    return items
 
 
 # ============================================================
@@ -302,6 +381,18 @@ def render_match_list(matched, missing):
 for key in ("cv_text", "job_text", "cv_data", "job_data", "score"):
     if key not in st.session_state:
         st.session_state[key] = None  # initialise each key to None on first load
+
+
+# ============================================================
+# Import Error Guard
+# If any pipeline module failed to import, show a clear error
+# and stop rendering — there's nothing useful to show otherwise.
+# ============================================================
+
+if _IMPORT_ERROR:
+    st.error(f"Failed to load a required module: {_IMPORT_ERROR}")
+    st.info("Make sure all dependencies are installed by running: uv sync")
+    st.stop()  # halt all further rendering for this rerun
 
 
 # ============================================================
@@ -320,126 +411,183 @@ st.markdown("<hr class='divider'>", unsafe_allow_html=True)
 
 # ============================================================
 # Step 1 & Step 2 — Inputs
-# Laid out side by side so both inputs are visible at once
-# without the user needing to scroll
+# Wrapped in a conditional so the upload UI disappears once
+# the analysis has run — keeping the results screen clean.
+# The "Start over" button at the bottom clears the score from
+# session state, which brings the inputs back.
 # ============================================================
 
-col1, col2 = st.columns(2, gap="large")
+if not st.session_state.score:
+    # only render the input UI when there are no results yet —
+    # once the user clicks Analyse Match the score is stored in
+    # session state and this entire block is skipped on the next rerun
+    col1, col2 = st.columns(2, gap="large")
 
-# ── Step 1: CV Upload ──────────────────────────────────────
-with col1:
-    st.markdown("<div class='step-label'>Step 01 — Your CV</div>", unsafe_allow_html=True)
+    # ── Step 1: CV Upload ──────────────────────────────────────
+    with col1:
+        st.markdown("<div class='step-label'>Step 01 — Your CV</div>", unsafe_allow_html=True)
 
-    # accept PDF, DOCX, and TXT — the same formats handled by CV_Upload.extract_text()
-    cv_file = st.file_uploader(
-        "Upload your CV",
-        type=["pdf", "docx", "txt"],
-        label_visibility="collapsed",  # hide the default label since step-label covers it
-    )
-
-    if cv_file:
-        try:
-            # write to a temp file so extract_text() can open it by path
-            tmp_path = save_upload_to_temp(cv_file)
-            cv_text  = extract_text(tmp_path)
-            os.unlink(tmp_path)  # clean up the temp file immediately after reading
-
-            # store extracted text in session state so it survives Streamlit reruns
-            st.session_state.cv_text = cv_text
-            st.success(f"✓ {cv_file.name}  ·  {len(cv_text):,} chars")
-        except Exception as e:
-            st.error(f"Could not read CV: {e}")
-            st.session_state.cv_text = None  # reset on error so stale data isn't used
-
-# ── Step 2: Job Offer Input ────────────────────────────────
-with col2:
-    st.markdown("<div class='step-label'>Step 02 — Job Offer</div>", unsafe_allow_html=True)
-
-    # mirror the cascading input approach from main.py: URL first, then paste, then file
-    job_input_method = st.radio(
-        "Job input method",
-        ["URL", "Paste text", "Upload file"],
-        horizontal=True,
-        label_visibility="collapsed",
-    )
-
-    job_text = None  # will be set by whichever input method succeeds
-
-    if job_input_method == "URL":
-        url = st.text_input("Job offer URL", placeholder="https://...")
-        if url:
-            with st.spinner("Fetching page…"):
-                # extract_from_url() tries requests first, then falls back to Selenium
-                job_text = extract_from_url(url)
-            if job_text:
-                st.success(f"✓ Fetched  ·  {len(job_text):,} chars")
-            else:
-                st.error("Could not extract text from that URL.")
-
-    elif job_input_method == "Paste text":
-        pasted = st.text_area("Paste job description here", height=180, placeholder="Paste the full job description…")
-        if pasted.strip():
-            # run the same clean_text() that the terminal version applies to pasted input
-            job_text = clean_text(pasted)
-            st.success(f"✓ {len(job_text):,} chars captured")
-
-    else:
-        # file upload — same logic as the CV upload above
-        job_file = st.file_uploader(
-            "Upload job description",
+        # accept PDF, DOCX, and TXT — the same formats handled by CV_Upload.extract_text()
+        cv_file = st.file_uploader(
+            "Upload your CV",
             type=["pdf", "docx", "txt"],
-            key="job_file",  # unique key needed because Streamlit only allows one uploader per key
+            label_visibility="collapsed",  # hide the default label since step-label covers it
+        )
+
+        if cv_file:
+            tmp_path = None
+            try:
+                # write to a temp file so extract_text() can open it by path
+                tmp_path = save_upload_to_temp(cv_file)
+                cv_text  = extract_text(tmp_path)
+
+                # reject suspiciously short extractions — likely a corrupt or empty file
+                if not cv_text or len(cv_text.strip()) < 20:
+                    st.error("The CV file appears to be empty or could not be read. Please try a different file.")
+                    st.session_state.cv_text = None
+                else:
+                    # store extracted text in session state so it survives Streamlit reruns
+                    st.session_state.cv_text = cv_text
+                    st.success(f"✓ {cv_file.name}  ·  {len(cv_text):,} chars")
+
+            except ValueError as e:
+                # unsupported file type — raised by save_upload_to_temp
+                st.error(str(e))
+                st.session_state.cv_text = None
+            except Exception as e:
+                logger.exception("Failed to process CV upload")
+                st.error(f"Could not read CV: {e}")
+                st.session_state.cv_text = None
+            finally:
+                # always clean up the temp file, even if extraction failed
+                if tmp_path and os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+
+    # ── Step 2: Job Offer Input ────────────────────────────────
+    with col2:
+        st.markdown("<div class='step-label'>Step 02 — Job Offer</div>", unsafe_allow_html=True)
+
+        # mirror the cascading input approach from main.py: URL first, then paste, then file
+        job_input_method = st.radio(
+            "Job input method",
+            ["URL", "Paste text", "Upload file"],
+            horizontal=True,
             label_visibility="collapsed",
         )
-        if job_file:
+
+        job_text = None  # will be set by whichever input method succeeds
+
+        if job_input_method == "URL":
+            url = st.text_input("Job offer URL", placeholder="https://...")
+            if url:
+                # basic URL sanity check before sending it to the network
+                if not url.startswith(("http://", "https://")):
+                    st.error("Please enter a valid URL starting with http:// or https://")
+                else:
+                    with st.spinner("Fetching page…"):
+                        try:
+                            # extract_from_url() tries requests first, then falls back to Selenium
+                            job_text = extract_from_url(url)
+                        except Exception as e:
+                            logger.exception("Failed to fetch URL: %s", url)
+                            st.error(f"Could not fetch the URL: {e}")
+
+                    if job_text and len(job_text.strip()) >= 20:
+                        st.success(f"✓ Fetched  ·  {len(job_text):,} chars")
+                    elif job_text is not None:
+                        st.error("The page was fetched but appears to contain no readable text.")
+                        job_text = None
+                    else:
+                        st.error("Could not extract text from that URL.")
+
+        elif job_input_method == "Paste text":
+            pasted = st.text_area(
+                "Paste job description here",
+                height=180,
+                placeholder="Paste the full job description…",
+            )
+            if pasted.strip():
+                if len(pasted.strip()) < 20:
+                    st.warning("The pasted text seems very short. Please paste the full job description.")
+                else:
+                    # run the same clean_text() that the terminal version applies to pasted input
+                    job_text = clean_text(pasted)
+                    st.success(f"✓ {len(job_text):,} chars captured")
+
+        else:
+            # file upload — same logic as the CV upload above
+            job_file = st.file_uploader(
+                "Upload job description",
+                type=["pdf", "docx", "txt"],
+                key="job_file",  # unique key needed because Streamlit only allows one uploader per key
+                label_visibility="collapsed",
+            )
+            if job_file:
+                tmp_path = None
+                try:
+                    tmp_path = save_upload_to_temp(job_file)
+                    job_text = extract_text(tmp_path)
+                    if not job_text or len(job_text.strip()) < 20:
+                        st.error("The job description file appears to be empty or could not be read.")
+                        job_text = None
+                    else:
+                        st.success(f"✓ {job_file.name}  ·  {len(job_text):,} chars")
+                except ValueError as e:
+                    st.error(str(e))
+                except Exception as e:
+                    logger.exception("Failed to process job file upload")
+                    st.error(f"Could not read file: {e}")
+                finally:
+                    # always clean up the temp file
+                    if tmp_path and os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+
+        # persist the job text in session state regardless of which input method was used
+        if job_text:
+            st.session_state.job_text = job_text
+
+    # ── Analyse Button ─────────────────────────────────────────
+    # Centred in a narrow middle column so it doesn't stretch
+    # edge-to-edge across the full page width
+    st.markdown("<hr class='divider'>", unsafe_allow_html=True)
+
+    _, btn_col, _ = st.columns([2, 1, 2])  # flanking empty columns to centre the button
+    with btn_col:
+        analyse = st.button("Analyse Match →")
+
+    if analyse:
+        # validate that both inputs are ready before running the pipeline
+        if not st.session_state.cv_text:
+            st.warning("Please upload your CV first.")
+        elif not st.session_state.job_text:
+            st.warning("Please provide the job offer first.")
+        else:
             try:
-                tmp_path = save_upload_to_temp(job_file)
-                job_text = extract_text(tmp_path)
-                os.unlink(tmp_path)  # clean up temp file
-                st.success(f"✓ {job_file.name}  ·  {len(job_text):,} chars")
+                with st.spinner("Parsing documents…"):
+                    # run the same parsing functions used by main.py
+                    cv_data  = parse_cv(st.session_state.cv_text)
+                    job_data = parse_job(st.session_state.job_text)
+                    score    = compute_score(cv_data, job_data)
+
+                # check whether the scorer itself reported an error
+                if score.get("error"):
+                    st.error(f"Scoring failed: {score['error']}")
+                else:
+                    # store results in session state so they persist after the button press reruns the script
+                    st.session_state.cv_data  = cv_data
+                    st.session_state.job_data = job_data
+                    st.session_state.score    = score
+                    st.rerun()  # immediately rerun so the inputs disappear and results appear
+
             except Exception as e:
-                st.error(f"Could not read file: {e}")
-
-    # persist the job text in session state regardless of which method was used
-    if job_text:
-        st.session_state.job_text = job_text
-
-
-# ============================================================
-# Analyse Button
-# Centred in a narrow middle column so it doesn't stretch
-# edge-to-edge across the full page width
-# ============================================================
-
-st.markdown("<hr class='divider'>", unsafe_allow_html=True)
-
-_, btn_col, _ = st.columns([2, 1, 2])  # flanking empty columns to centre the button
-with btn_col:
-    analyse = st.button("Analyse Match →")
-
-if analyse:
-    # validate that both inputs are ready before running the pipeline
-    if not st.session_state.cv_text:
-        st.warning("Please upload your CV first.")
-    elif not st.session_state.job_text:
-        st.warning("Please provide the job offer first.")
-    else:
-        with st.spinner("Parsing documents…"):
-            # run the same parsing functions used by main.py
-            cv_data  = parse_cv(st.session_state.cv_text)
-            job_data = parse_job(st.session_state.job_text)
-            score    = compute_score(cv_data, job_data)
-
-        # store results in session state so they persist after the button press reruns the script
-        st.session_state.cv_data  = cv_data
-        st.session_state.job_data = job_data
-        st.session_state.score    = score
+                logger.exception("Pipeline failed during analysis")
+                st.error(f"Something went wrong during analysis: {e}")
 
 
 # ============================================================
 # Step 3 — Results
 # Only renders once session_state.score has been populated
-# (i.e. after the user clicks Analyse Match)
+# (i.e. after the user clicks Analyse Match successfully)
 # ============================================================
 
 if st.session_state.score:
@@ -456,24 +604,32 @@ if st.session_state.score:
 
     with score_col:
         # convert the numeric score into a simple text grade for quick readability
-        grade = "Excellent" if score["overall"] >= 75 else "Good" if score["overall"] >= 50 else "Needs Work"
+        grade = (
+            "Excellent" if score["overall"] >= 75
+            else "Good"  if score["overall"] >= 50
+            else "Needs Work"
+        )
         st.markdown(f"""
         <div class='score-box'>
           <div class='score-number'>{score["overall"]}</div>
-          <div class='score-label'>/ 100 &nbsp;·&nbsp; {grade}</div>
+          <div class='score-label'>/ 100 &nbsp;·&nbsp; {_escape(grade)}</div>
         </div>
         """, unsafe_allow_html=True)
 
     with metrics_col:
-        # show a percentage card for each of the four categories
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Technical",    f"{score['tech']['ratio']*100:.0f}%")
-        m2.metric("Programming",  f"{score['prog']['ratio']*100:.0f}%")
-        m3.metric("Soft Skills",  f"{score['soft']['ratio']*100:.0f}%")
-        m4.metric("Languages",    f"{score['lang']['ratio']*100:.0f}%")
+        # show a percentage card for each of the six scoring categories
+        # laid out across two rows of three so they don't get too cramped
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Technical",   f"{score['tech']['ratio']*100:.0f}%")
+        m2.metric("Programming", f"{score['prog']['ratio']*100:.0f}%")
+        m3.metric("Soft Skills", f"{score['soft']['ratio']*100:.0f}%")
+        m4, m5, m6 = st.columns(3)
+        m4.metric("Contextual",  f"{score['contextual']['ratio']*100:.0f}%")
+        m5.metric("Finance",     f"{score['finance']['ratio']*100:.0f}%")
+        m6.metric("Languages",   f"{score['lang']['ratio']*100:.0f}%")
 
         # only show the required-skills line if the job offer had any required tags
-        if score["required_total"]:
+        if score.get("required_total"):
             req_pct = round(len(score["required_found"]) / len(score["required_total"]) * 100)
             st.markdown(
                 f"<div style='font-size:0.8rem;color:#888;margin-top:0.8rem'>"
@@ -487,27 +643,37 @@ if st.session_state.score:
     # ── Detailed skill breakdown tabs ──────────────────────
     # Each tab shows CV skills vs. job skills side by side,
     # then a matched/missing breakdown below
-    tab1, tab2, tab3, tab4 = st.tabs(["Technical Skills", "Programming", "Soft Skills", "Languages"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        ["Technical Skills", "Programming", "Soft Skills", "Contextual", "Finance", "Languages"]
+    )
 
     with tab1:
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Your CV**")
-            render_tags(cv_data["technical_skills"], "tag-tech")
+            # show canonical (resolved) skill names rather than raw keywords
+            # so synonyms like "JS" and "JavaScript" appear as one grouped skill
+            cv_tech = list(cv_data.get("technical_resolved", {}).keys())
+            render_tags(cv_tech, "tag-tech")
         with c2:
             st.markdown("**Job Requires**")
-            render_tags(job_data["technical_skills"], "tag-tech")
-        st.markdown("**Match breakdown** — <span style='color:#c8f55a'>●</span> matched &nbsp; <span style='color:#444'>●</span> missing from CV", unsafe_allow_html=True)
+            job_tech = list(job_data.get("technical_resolved", {}).keys())
+            render_tags(job_tech, "tag-tech")
+        st.markdown(
+            "**Match breakdown** — <span style='color:#c8f55a'>●</span> matched "
+            "&nbsp; <span style='color:#444'>●</span> missing from CV",
+            unsafe_allow_html=True,
+        )
         render_match_list(score["tech"]["matched"], score["tech"]["missing"])
 
     with tab2:
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Your CV**")
-            render_tags(cv_data["programming"], "tag-prog")
+            render_tags(cv_data.get("programming", []), "tag-prog")
         with c2:
             st.markdown("**Job Requires**")
-            render_tags(job_data["programming"], "tag-prog")
+            render_tags(job_data.get("programming", []), "tag-prog")
         st.markdown("**Match breakdown**", unsafe_allow_html=True)
         render_match_list(score["prog"]["matched"], score["prog"]["missing"])
 
@@ -515,38 +681,62 @@ if st.session_state.score:
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Your CV**")
-            render_tags(cv_data["soft_skills"], "tag-soft")
+            render_tags(cv_data.get("soft_skills", []), "tag-soft")
         with c2:
             st.markdown("**Job Requires**")
-            render_tags(job_data["soft_skills"], "tag-soft")
+            render_tags(job_data.get("soft_skills", []), "tag-soft")
         st.markdown("**Match breakdown**", unsafe_allow_html=True)
         render_match_list(score["soft"]["matched"], score["soft"]["missing"])
 
     with tab4:
+        # contextual skills are detected from sentence patterns rather than
+        # keyword lists, so they represent skills the candidate described
+        # in context rather than just listed explicitly
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Your CV**")
-            # include the proficiency level in the tag text (e.g. "french (advanced)")
-            lang_items = [f"{lang} ({info['level']})" for lang, info in cv_data["languages"].items()]
-            render_tags(lang_items, "tag-lang")
+            render_tags(cv_data.get("contextual_skills", []), "tag-soft")
         with c2:
             st.markdown("**Job Requires**")
-            lang_items_job = [f"{lang} ({info['level']})" for lang, info in job_data["languages"].items()]
-            render_tags(lang_items_job, "tag-lang")
+            render_tags(job_data.get("contextual_skills", []), "tag-soft")
         st.markdown("**Match breakdown**", unsafe_allow_html=True)
-        # strip the proficiency level for the plain comparison (just language names)
+        render_match_list(score["contextual"]["matched"], score["contextual"]["missing"])
+
+    with tab5:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**Your CV**")
+            render_tags(cv_data.get("finance", []), "tag-req")
+        with c2:
+            st.markdown("**Job Requires**")
+            render_tags(job_data.get("finance", []), "tag-req")
+        st.markdown("**Match breakdown**", unsafe_allow_html=True)
+        render_match_list(score["finance"]["matched"], score["finance"]["missing"])
+
+    with tab6:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**Your CV**")
+            # _safe_lang_items handles missing or malformed language entries gracefully
+            render_tags(_safe_lang_items(cv_data.get("languages", {})), "tag-lang")
+        with c2:
+            st.markdown("**Job Requires**")
+            render_tags(_safe_lang_items(job_data.get("languages", {})), "tag-lang")
+        st.markdown("**Match breakdown**", unsafe_allow_html=True)
+        # compare just the language names (not proficiency levels) for the dot list
         render_match_list(score["lang"]["matched"], score["lang"]["missing"])
 
     # ── Skill importance tags (collapsible) ────────────────
     # Only shown when the parser found importance tags in the job offer
-    # (i.e. skills in required/preferred/responsibility sections)
-    if job_data.get("importance"):
+    # (i.e. skills classified as required/preferred/responsibility)
+    importance = job_data.get("importance")
+    if isinstance(importance, dict) and importance:
         st.markdown("<hr class='divider'>", unsafe_allow_html=True)
         with st.expander("Skill importance tags from job offer"):
             # split skills by importance level so the user can see what's required vs. nice-to-have
-            req  = [k for k, v in job_data["importance"].items() if v == "required"]
-            pref = [k for k, v in job_data["importance"].items() if v == "preferred"]
-            resp = [k for k, v in job_data["importance"].items() if v == "responsibility"]
+            req  = [k for k, v in importance.items() if v == "required"]
+            pref = [k for k, v in importance.items() if v == "preferred"]
+            resp = [k for k, v in importance.items() if v == "responsibility"]
             if req:
                 st.markdown("**Required**")
                 render_tags(req, "tag-req")
@@ -560,10 +750,15 @@ if st.session_state.score:
     # ── Experience requirements (collapsible) ──────────────
     # Shows the exact phrases extracted by extract_experience_requirements()
     # so the user can see the original context for each year requirement
-    if job_data.get("experience_required"):
+    experience = job_data.get("experience_required")
+    if isinstance(experience, list) and experience:
         with st.expander("Experience requirements in job offer"):
-            for exp in job_data["experience_required"]:
-                st.markdown(f"- **{exp['years']} year(s)** — _{exp['context']}_")
+            for exp in experience:
+                # guard against malformed experience entries missing expected keys
+                if isinstance(exp, dict) and "years" in exp and "context" in exp:
+                    st.markdown(
+                        f"- **{_escape(str(exp['years']))} year(s)** — _{_escape(str(exp['context']))}_"
+                    )
 
     # ── Reset button ───────────────────────────────────────
     # Clears all session state and reruns the script from the top,

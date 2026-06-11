@@ -133,8 +133,8 @@ Terminal-based alternative to `app.py`. Uses Tkinter file dialogs for CV selecti
 4. `scorer.py` computes the overlap between the two parsed documents in each category, combines the ratios with fixed weights, adds a required-skills bonus, and returns a final integer score from 0 to 100.
 5. `app.py` renders the results as a score box, metric cards, and tabbed skill breakdowns.
 ## Prupose of the project
-This project was built as part of the Skills Programming course. The goal was to apply Python programming concepts to a practical problem: helping job applicants understand how well their CV matches a given job description, and identifying which skills to highlight or add.
+This project was built as part of the Skills Programming Introduction course. The goal was to apply Python programming concepts to a practical problem: In our case, we help job applicants understand how well their CV matches a given job description, and identifying which skills to highlight or add.
 ## Authors
-Abisanth ..., Damjan ..., Manuel Altmann, Pamir ... and William ...
+Abisanth ..., Damjan ..., Manuel Altmann, Pamir ... and William ... from University of St. Gallen (HSG)
 ## Further Questions
 For questions about the codebase, contact the project authors directly.

@@ -14,14 +14,14 @@ CV Job Matcher is a web-based tool that compares a candidate's CV against a job 
 - Browser-based interface built with Streamlit (no terminal required)
 ## Technologies used
 - **Python 3.14**
-- **Streamlit** — web interface
-- **pypdf** — PDF text extraction
-- **python-docx** — DOCX text extraction
-- **BeautifulSoup4** — HTML parsing for URL-based job offers
-- **Selenium + Chromium** — fallback browser for JavaScript-heavy job pages
-- **requests** — HTTP fetching
-- **pathlib** — file path handling
-- **re** — regular expression keyword matching
+- **Streamlit**; web interface
+- **pypdf**; PDF text extraction
+- **python-docx**; DOCX text extraction
+- **BeautifulSoup4**; HTML parsing for URL-based job offers
+- **Selenium + Chromium**; fallback browser for JavaScript-heavy job pages
+- **requests**; HTTP fetching
+- **pathlib**; file path handling
+- **re**; regular expression keyword matching
 ## Installation
 1. Clone the repository and navigate into the project folder.
 2. Make sure Python 3.14 or higher is installed.

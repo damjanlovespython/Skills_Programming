@@ -137,4 +137,4 @@ This project was built as part of the Skills Programming course. The goal was to
 ## Authors
 Abisanth ..., Damjan ..., Manuel Altmann, Pamir ... and William ...
 ## Further Questions
-For questions about the codebase contact the project authors directly.
+For questions about the codebase, contact the project authors directly.

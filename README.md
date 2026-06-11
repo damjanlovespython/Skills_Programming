@@ -23,26 +23,71 @@ CV Job Matcher is a web-based tool that compares a candidate's CV against a job 
 - **pathlib**; file path handling
 - **re**; regular expression keyword matching
 ## Installation
-1. Clone the repository and navigate into the project folder.
-2. Make sure Python 3.14 or higher is installed.
-3. Install system packages (for Selenium fallback):
-   ```
-   sudo apt update && sudo apt install -y chromium chromium-driver
-   ```
-4. Install Python dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-   Or with uv:
-   ```
+### Prerequisites
+Make sure Python 3.14 or higher is installed. You can download it from https://www.python.org/downloads/.
+To verify your Python version, open a terminal and run:
+```bash
+python --version
+```
+### Windows
+1. Download or clone the repository and open the project folder in VS Code (right-click the folder and select "Open with Code").
+2. Open the terminal in VS Code: Terminal → New Terminal.
+3. Install uv:
+```bash
+   pip install uv
+```
+4. Install all dependencies:
+```bash
    uv sync
-   ```
+```
 5. Run the app:
-   ```
-   streamlit run app.py
-   ```
-
-The app will open at `http://localhost:8501`.
+```bash
+   uv run streamlit run app.py
+```
+Note: The Selenium fallback for JavaScript-heavy job pages is not supported natively on Windows without WSL. The simple URL extraction via requests will still work for most job postings.
+### macOS
+1. Download or clone the repository and open the project folder in VS Code (right-click the folder and select "Open with Code").
+2. Open the terminal in VS Code: Terminal → New Terminal.
+3. Install uv:
+```bash
+   pip install uv
+```
+4. Install all dependencies:
+```bash
+   uv sync
+```
+5. Install Chromium for the Selenium fallback (requires Homebrew):
+```bash
+   brew install chromium chromedriver
+```
+6. Run the app:
+```bash
+   uv run streamlit run app.py
+```
+### Linux
+1. Download or clone the repository and open the project folder in VS Code (right-click the folder and select "Open with Code").
+2. Open the terminal in VS Code: Terminal → New Terminal.
+3. Install system packages required for the Selenium fallback:
+```bash
+   sudo apt update && sudo apt install -y chromium chromium-driver
+```
+4. Install uv:
+```bash
+   pip install uv
+```
+5. Install all dependencies:
+```bash
+   uv sync
+```
+6. Run the app:
+```bash
+   uv run streamlit run app.py
+```
+The app will open at `http://localhost:8501` on all operating systems.
+### Windows
+1. Download or clone the repository and open the project folder in VS Code (right-click the folder and select "Open with Code").
+2. Open the terminal in VS Code: Terminal → New Terminal.
+3. Install uv:
 ## Usage
 1. **Upload your CV**: Drag and drop or browse for your CV file (PDF, DOCX, or TXT).
 2. **Provide the job offer**: Paste the URL of the job posting, type or paste the job description directly, or upload a file.

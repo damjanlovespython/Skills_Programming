@@ -84,10 +84,6 @@ Note: The Selenium fallback for JavaScript-heavy job pages is not supported nati
    uv run streamlit run app.py
 ```
 The app will open at `http://localhost:8501` on all operating systems.
-### Windows
-1. Download or clone the repository and open the project folder in VS Code (right-click the folder and select "Open with Code").
-2. Open the terminal in VS Code: Terminal → New Terminal.
-3. Install uv:
 ## Usage
 1. **Upload your CV**: Drag and drop or browse for your CV file (PDF, DOCX, or TXT).
 2. **Provide the job offer**: Paste the URL of the job posting, type or paste the job description directly, or upload a file.

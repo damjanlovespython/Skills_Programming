@@ -1,6 +1,7 @@
 # CV Job Matcher: Match your CV against any job offer in seconds.
 ## Short description
 CV Job Matcher is a web-based tool that compares a candidate's CV against a job offer and returns a structured match score. It extracts keywords from both documents, groups synonyms, and breaks down the result by category so the user knows exactly what is missing and what is already covered.
+
 ## Features
 - Upload a CV in PDF, DOCX, or TXT format
 - Provide a job offer via URL, copy-paste, or file upload
@@ -12,6 +13,7 @@ CV Job Matcher is a web-based tool that compares a candidate's CV against a job 
 - Skill importance tags extracted from the job offer (required / preferred / responsibility)
 - Experience requirement detection (e.g. "3+ years of experience in Python")
 - Browser-based interface built with Streamlit (no terminal required)
+
 ## Technologies used
 - **Python 3.14**
 - **Streamlit**; web interface
@@ -22,6 +24,7 @@ CV Job Matcher is a web-based tool that compares a candidate's CV against a job 
 - **requests**; HTTP fetching
 - **pathlib**; file path handling
 - **re**; regular expression keyword matching
+
 ## Installation
 ### Prerequisites
 Make sure Python 3.14 or higher is installed. You can download it from https://www.python.org/downloads/.
@@ -29,6 +32,7 @@ To verify your Python version, open a terminal and run:
 ```bash
 python --version
 ```
+
 ### Windows
 1. Download or clone the repository and open the project folder in VS Code (right-click the folder and select "Open with Code").
 2. Open the terminal in VS Code: Terminal → New Terminal.
@@ -45,6 +49,7 @@ python --version
    uv run streamlit run app.py
 ```
 Note: The Selenium fallback for JavaScript-heavy job pages is not supported natively on Windows without WSL. The simple URL extraction via requests will still work for most job postings.
+
 ### macOS
 1. Download or clone the repository and open the project folder in VS Code (right-click the folder and select "Open with Code").
 2. Open the terminal in VS Code: Terminal → New Terminal.
@@ -64,6 +69,7 @@ Note: The Selenium fallback for JavaScript-heavy job pages is not supported nati
 ```bash
    uv run streamlit run app.py
 ```
+
 ### Linux
 1. Download or clone the repository and open the project folder in VS Code (right-click the folder and select "Open with Code").
 2. Open the terminal in VS Code: Terminal → New Terminal.
@@ -84,13 +90,14 @@ Note: The Selenium fallback for JavaScript-heavy job pages is not supported nati
    uv run streamlit run app.py
 ```
 The app will open at `http://localhost:8501` on all operating systems.
+
 ## Usage
 1. **Upload your CV**: Drag and drop or browse for your CV file (PDF, DOCX, or TXT).
 2. **Provide the job offer**: Paste the URL of the job posting, type or paste the job description directly, or upload a file.
 3. Click **Analyse Match**.
 4. **Results**: View your overall score, per-category percentages, and a full matched/missing breakdown across six tabs.
-## Structure
 
+## Structure
 ```
 .
 ├── app.py                  # Streamlit web interface (main entry point)
@@ -126,15 +133,19 @@ Streamlit web interface. Manages session state so results persist after the butt
 
 ### `main.py`
 Terminal-based alternative to `app.py`. Uses Tkinter file dialogs for CV selection and cascading input methods (URL → paste → file) for the job offer. Useful for testing the pipeline without running Streamlit.
+
 ## How it works
 1. The user uploads a CV and provides a job offer.
 2. `CV_Upload.py` extracts and cleans the raw text from both.
 3. `Structure_Parser.py` scans both texts against keyword lists, resolves synonyms, and tags job keywords by importance.
 4. `scorer.py` computes the overlap between the two parsed documents in each category, combines the ratios with fixed weights, adds a required-skills bonus, and returns a final integer score from 0 to 100.
 5. `app.py` renders the results as a score box, metric cards, and tabbed skill breakdowns.
-## Prupose of the project
+
+## Purpose of the project
 This project was built as part of the Skills Programming Introduction course. The goal was to apply Python programming concepts to a practical problem: In our case, we help job applicants understand how well their CV matches a given job description, and identifying which skills to highlight or add.
+
 ## Authors
-Abisanth ..., Damjan ..., Manuel Altmann, Pamir ... and William ... from University of St. Gallen (HSG)
+Abisanth ..., Damjan ..., Manuel Altmann, Pamir ... and William Wuillemin from University of St. Gallen (HSG)
+
 ## Further Questions
 For questions about the codebase, contact the project authors directly.

@@ -135,6 +135,6 @@ Terminal-based alternative to `app.py`. Uses Tkinter file dialogs for CV selecti
 ## Prupose of the project
 This project was built as part of the Skills Programming Introduction course. The goal was to apply Python programming concepts to a practical problem: In our case, we help job applicants understand how well their CV matches a given job description, and identifying which skills to highlight or add.
 ## Authors
-Abisanth ..., Damjan ..., Manuel Altmann, Pamir ... and William ... from University of St. Gallen (HSG)
+Abisanth ..., Damjan Boskov, Manuel Altmann, Pamir ... and William ... from University of St. Gallen (HSG)
 ## Further Questions
 For questions about the codebase, contact the project authors directly.

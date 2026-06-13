@@ -12,6 +12,7 @@ full per-category breakdown.
 """
 
 import logging
+import re
 
 # module-level logger — errors are recorded without crashing the app
 logger = logging.getLogger(__name__)
@@ -193,6 +194,29 @@ def overlap_resolved(cv_resolved, job_resolved) -> tuple:
 
 
 # ============================================================
+# Frequency-based Required Skills Fallback
+# ============================================================
+
+def _get_required_by_frequency(job_data: dict) -> list:
+    """
+    Fallback for when the job offer has no explicit importance tags.
+    Counts how many times each already-parsed skill appears in the raw
+    job text. Skills mentioned 2+ times are treated as implicitly required.
+    Only skills the parser already found are checked — random words are ignored.
+    """
+    job_text = job_data.get("full_text", "")
+    if not job_text:
+        return []
+    all_skills = (
+        list(_safe_dict(job_data.get("technical_resolved")).keys()) +
+        _safe_list(job_data.get("soft_skills"))
+    )
+    text_lower = job_text.lower()
+    return [s for s in all_skills
+            if len(re.findall(r'\b' + re.escape(s.lower()) + r'\b', text_lower)) >= 2]
+
+
+# ============================================================
 # Main Scoring Function
 # ============================================================
 
@@ -207,6 +231,8 @@ def compute_score(cv_data: dict, job_data: dict) -> dict:
     Scoring method:
         1. Validate both input dicts have the expected structure
         2. Use technical_resolved for technical skill comparison (synonym-aware)
+        2b. If no explicit importance tags exist, fall back to frequency-based
+            required skill detection using the raw job text in job_data["full_text"]
         3. Compute keyword overlap for programming, soft, contextual, finance, languages
         4. Combine into a weighted average using WEIGHTS above
         5. Add a small bonus (up to REQUIRED_SKILLS_BOOST) for covering required skills
@@ -293,6 +319,9 @@ def compute_score(cv_data: dict, job_data: dict) -> dict:
     # or soft skills — covers both hard and soft required skills
     importance     = _safe_dict(job_data.get("importance"))
     required_total = [k for k, v in importance.items() if v == "required"]
+
+    if not required_total:
+        required_total = _get_required_by_frequency(job_data)
 
     # build a single set of all CV skills to check against
     cv_all_skills = {str(s).lower() for s in (

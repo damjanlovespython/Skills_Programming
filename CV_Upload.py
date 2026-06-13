@@ -10,15 +10,9 @@ and extracting clean text from them.
 import docx
 import requests
 from selenium import webdriver
-# import chromedriver_autoinstaller
 import time
-# chromedriver_autoinstaller.install()
-
-# Testing
-from selenium.webdriver.chrome.options import Options
 
 
-        
 # function import
 from pypdf import PdfReader
 from pathlib import Path
@@ -132,12 +126,10 @@ def extract_from_url(url):
     # Try 2: Selenium
     try:
         options = Options()
-        #Testing
         options.binary_location = "/usr/bin/chromium"
-            
+
         options.add_argument("--headless")
 
-        #Testing
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")

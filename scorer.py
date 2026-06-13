@@ -41,11 +41,6 @@ WEIGHTS = {
 # 0.10 means up to +10 points on top of the weighted score.
 REQUIRED_SKILLS_BOOST = 0.10
 
-# Minimum number of characters we expect in a parsed document.
-# Anything shorter is likely an extraction failure and we refuse
-# to score it rather than returning a meaningless result.
-MIN_TEXT_LENGTH = 20
-
 
 # ============================================================
 # Input Validation

@@ -10,7 +10,7 @@ import re
 
 # keywords
 
-PROGRAMMING_LANGUAGES = ["python", "java", "javascript", "c#", "c\\+\\+", "r", "sql", "html", "css","php", "ruby", "swift", "kotlin", "typescript", "matlab", "vba", "latex","scala", "perl", "rust", "go", "golang", "lua", "haskell", "fortran","cobol", "assembly", "bash", "shell", "powershell", "objective-c","visual basic", "vb.net", "groovy", "dart", "julia", "sas", "stata","nosql", "plsql", "t-sql", "xml", "json", "yaml", "graphql","solidity", "elixir", "clojure", "lisp", "prolog"]
+PROGRAMMING_LANGUAGES = ["python", "java", "javascript", "c#", "c++", "r", "sql", "html", "css","php", "ruby", "swift", "kotlin", "typescript", "matlab", "vba", "latex","scala", "perl", "rust", "go", "golang", "lua", "haskell", "fortran","cobol", "assembly", "bash", "shell", "powershell", "objective-c","visual basic", "vb.net", "groovy", "dart", "julia", "sas", "stata","nosql", "plsql", "t-sql", "xml", "json", "yaml", "graphql","solidity", "elixir", "clojure", "lisp", "prolog"]
 
 CS_SKILLS = ["software development", "software engineering", "web development","frontend", "front-end", "backend", "back-end", "full stack", "fullstack","mobile development", "app development", "api", "rest api", "microservices","object oriented", "oop", "functional programming", "devops", "ci/cd","test driven", "tdd", "unit testing", "integration testing", "debugging","data analysis", "data science", "data engineering", "data mining","machine learning", "deep learning", "artificial intelligence","neural networks", "natural language processing", "nlp","computer vision", "reinforcement learning", "big data","data visualization", "data warehouse", "etl", "data pipeline","predictive modeling", "feature engineering", "a/b testing","database", "mysql", "postgresql", "mongodb", "oracle", "sql server","redis", "elasticsearch", "cassandra", "dynamodb", "sqlite", "mariadb","firebase", "neo4j", "snowflake", "databricks","aws", "amazon web services", "azure", "google cloud", "gcp","cloud computing", "serverless", "lambda", "kubernetes", "docker","terraform", "ansible", "jenkins", "linux", "unix", "windows server","networking", "tcp/ip", "dns", "load balancing", "cdn","cybersecurity", "information security", "penetration testing","encryption", "firewall", "vulnerability assessment", "soc","incident response", "compliance", "gdpr", "iso 27001","excel", "word", "powerpoint", "microsoft office", "ms office","google sheets", "google docs", "google slides", "libreoffice","figma", "sketch", "adobe", "photoshop", "illustrator","wordpress", "shopify", "salesforce", "sap", "erp", "crm","git", "github", "gitlab", "bitbucket", "jira", "confluence","slack", "trello", "asana", "notion","react", "angular", "vue", "node.js", "django", "flask", "spring","express", ".net", "laravel", "rails", "bootstrap", "tailwind","tensorflow", "pytorch", "scikit-learn", "pandas", "numpy", "scipy","matplotlib", "seaborn", "plotly", "spark", "hadoop", "kafka","airflow", "dbt", "power bi", "tableau", "looker", "qlik","agile", "scrum", "kanban", "waterfall", "lean","project management", "product management"]
 
@@ -45,7 +45,7 @@ SYNONYMS = {
     "word":                 ["word", "microsoft word", "ms word"],
     "python":               ["python", "python3", "python 3"],
     "javascript":           ["javascript", "js", "ecmascript"],
-    "c\\+\\+":             ["c\\+\\+", "cpp"],
+    "c++":                 ["c++", "cpp"],
     "machine learning":     ["machine learning", "ml"],
     "artificial intelligence": ["artificial intelligence", "ai"],
     "natural language processing": ["natural language processing", "nlp"],
@@ -330,7 +330,7 @@ def find_keywords(text, keyword_list):
     found = []
     # goes through all the keyword in the list and identify it using the pattern of the unique word and addit is to a new list
     for keyword in keyword_list:
-        pattern = r'\b' + re.escape(keyword.lower()) + r'\b'
+        pattern = r'(?<![a-zA-Z0-9])' + re.escape(keyword.lower()) + r'(?![a-zA-Z0-9])'
         if re.search(pattern, text_lower):
             if keyword not in found:
                 found.append(keyword)

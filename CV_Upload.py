@@ -9,6 +9,7 @@ and extracting clean text from them.
 # library
 import docx
 import requests
+import sys
 from selenium import webdriver
 import time
 
@@ -126,7 +127,8 @@ def extract_from_url(url):
     # Try 2: Selenium
     try:
         options = Options()
-        options.binary_location = "/usr/bin/chromium"
+        if sys.platform.startswith("linux"):
+            options.binary_location = "/usr/bin/chromium"
 
         options.add_argument("--headless")
 
@@ -203,8 +205,6 @@ def clean_text(text):
 # It's useful for testing the module on its own.
 # ============================================================
 if __name__ == "__main__":
-    import sys
-
     # You can test by running: python CV_Upload.py my_file.pdf
     if len(sys.argv) < 2:
         print("Usage: python extractor.py <filepath>")
